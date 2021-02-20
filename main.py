@@ -47,14 +47,16 @@ def get_round_info():
     return r.json()
 
 def get_fav_odds(round_data):
-    base = 'http://www.oddschecker.com/football/english/'
+    base = 'http://www.oddschecker.com/football/'
     competiton = get_competiton_name(int(round_data['competitionId']))
     home_team = get_team_name(round_data['homeTeam']['id'])
     away_team = get_team_name(round_data['awayTeam']['id'])
     home_team = home_team.replace(' ','-')
     away_team = away_team.replace(' ','-')
     competiton = competiton.replace(' ','-')
-    print(f"Trying: {base}{competiton}/{home_team}-v-{away_team}")
+    if competiton != 'champions-league':
+        base += 'english/'
+    print(f"Trying: {base}{competiton}/{home_team}-v-{away_team}/correct-score")
     url = f"{base}{competiton}/{home_team}-v-{away_team}/correct-score"
 
     try:
@@ -97,7 +99,6 @@ def sort_scores(score, game):
 def post_predictions(data):
     login_url = "https://www.skybet.com/secure/identity/m/login/super6"
     params = {"username": USERNAME, "pin": PIN}
-    print(params)
     headers = {"X-Requested-With": "XMLHttpRequest"}
     p = s.post(login_url, json=params, headers=headers).json()
 
@@ -110,12 +111,6 @@ def post_predictions(data):
 
     predictions_url = 'https://api.s6.sbgservices.com/v2/user/self/prediction'
     s.post(predictions_url, json=data, headers=headers)
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -136,7 +131,7 @@ if __name__ == "__main__":
         'challengeId': active_round['goldenGoalChallenge']['id'],
         "time":11
     }
-    data["headToHeadEnter"]: True
+    data["headToHeadEnter"] = True
     post_predictions(data)
 
 

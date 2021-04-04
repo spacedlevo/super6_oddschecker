@@ -1,11 +1,11 @@
-import requests
-from bs4 import BeautifulSoup
+import os
 import re
 import sqlite3 as sql
-import os
-from dotenv import load_dotenv
 import sys
 
+import requests
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 
 BASE_URL = 'https://super6.skysports.com/api/v2/'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
@@ -13,8 +13,8 @@ DB = 'super6.db'
 load_dotenv()
 USERNAME = os.getenv('USERNAME')
 PIN = os.getenv('PIN')
-
-
+PUSHOVER_TOKEN = os.getenv('PUSHOVER_TOKEN')
+PUSHOVER_USER = os.getenv('PUSHOVER_USER')
 
 def get_team_name(team_id):
     with sql.connect(DB) as con:
@@ -76,10 +76,11 @@ def get_fav_odds(round_data):
                 continue
             else:
                 score = row.text.strip()
-                break
-        except IndexError:
-            continue
-    return score
+                score = score.replace('Nottm', 'Nottingham')
+            return score
+        except UnboundLocalError:
+            print('skipping')
+            return None
 
 def sort_scores(score, game):
     team_re = re.compile(r'^\D+')
@@ -89,7 +90,7 @@ def sort_scores(score, game):
     goals_int = [int(i) for i in goals]
     with sql.connect(DB) as con:
         cur = con.cursor()
-        cur.execute(''' SELECT id FROM teams WHERE name = ?  ''', (winner, ))
+        cur.execute(" SELECT id FROM teams WHERE name LIKE ? ", (winner+'%', ))
         winner_id = cur.fetchone()[0]
     if game['homeTeam']['id'] ==  winner_id:
         return max(goals_int), min(goals_int)
@@ -99,7 +100,7 @@ def sort_scores(score, game):
 def post_predictions(data):
     login_url = "https://www.skybet.com/secure/identity/m/login/super6"
     params = {"username": USERNAME, "pin": PIN}
-    headers = {"X-Requested-With": "XMLHttpRequest"}
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36', "X-Requested-With": "XMLHttpRequest"}
     p = s.post(login_url, json=params, headers=headers).json()
 
     try:
@@ -110,7 +111,14 @@ def post_predictions(data):
     headers = {"authorization": f"sso {sso_token}"}
 
     predictions_url = 'https://api.s6.sbgservices.com/v2/user/self/prediction'
-    s.post(predictions_url, json=data, headers=headers)
+    r = s.post(predictions_url, json=data, headers=headers)
+    return r
+
+def send_alert():
+    text = 'Super 6 Script Failed, needs attention'
+    payload = {"message": text, "user": PUSHOVER_USER, "token": PUSHOVER_TOKEN }
+    r = requests.post('https://api.pushover.net/1/messages.json', data=payload, headers={'User-Agent': 'Python'})
+    return r
 
 
 if __name__ == "__main__":
@@ -123,8 +131,11 @@ if __name__ == "__main__":
             predictions = {}
             predictions['challengeId'] = game['id']
             score = get_fav_odds(game['match'])
-            predictions['scoreHome'], predictions['scoreAway'] = sort_scores(score, game['match'])
-            data['scores'].append(predictions)
+            if score is None:
+                continue
+            else:
+                predictions['scoreHome'], predictions['scoreAway'] = sort_scores(score, game['match'])
+                data['scores'].append(predictions)
 
 
     data['goldenGoal'] = {
@@ -132,6 +143,9 @@ if __name__ == "__main__":
         "time":11
     }
     data["headToHeadEnter"] = True
-    post_predictions(data)
+    r = post_predictions(data)
+    print(r)
+    if r.status_code == 501:
+        send_alert()
 
 

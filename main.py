@@ -47,6 +47,7 @@ def get_round_info():
     return r.json()
 
 def get_fav_odds(round_data):
+    non_english = ['champions-league', 'euro-2020']
     base = 'http://www.oddschecker.com/football/'
     competiton = get_competiton_name(int(round_data['competitionId']))
     home_team = get_team_name(round_data['homeTeam']['id'])
@@ -54,7 +55,7 @@ def get_fav_odds(round_data):
     home_team = home_team.replace(' ','-')
     away_team = away_team.replace(' ','-')
     competiton = competiton.replace(' ','-')
-    if competiton != 'champions-league':
+    if competiton not in non_english:
         base += 'english/'
     print(f"Trying: {base}{competiton}/{home_team}-v-{away_team}/correct-score")
     url = f"{base}{competiton}/{home_team}-v-{away_team}/correct-score"
@@ -77,6 +78,7 @@ def get_fav_odds(round_data):
             else:
                 score = row.text.strip()
                 score = score.replace('Nottm', 'Nottingham')
+                score = score.replace('Oxford Utd', 'Oxford')
             return score
         except UnboundLocalError:
             print('skipping')
@@ -144,8 +146,8 @@ if __name__ == "__main__":
     }
     data["headToHeadEnter"] = True
     r = post_predictions(data)
-    print(r)
-    if r.status_code == 501:
+    print(r.status_code)
+    if r.status_code != 201:
         send_alert()
 
 

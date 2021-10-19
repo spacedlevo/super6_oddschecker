@@ -2,19 +2,30 @@ import os
 import re
 import sqlite3 as sql
 import sys
+from collections import OrderedDict
+import cloudscraper
+
 
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 BASE_URL = 'https://super6.skysports.com/api/v2/'
-HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+HEADERS = OrderedDict({
+    'Accept-Encoding': 'gzip, deflate, br',
+    'User-Agent':'Mozilla/5.0 (X11; Linux x86_64; rv:93.0) Gecko/20100101 Firefox/93.0'})
 DB = 'super6.db'
 load_dotenv()
 USERNAME = os.getenv('USERNAME')
 PIN = os.getenv('PIN')
 PUSHOVER_TOKEN = os.getenv('PUSHOVER_TOKEN')
 PUSHOVER_USER = os.getenv('PUSHOVER_USER')
+scraper = cloudscraper.create_scraper(browser={
+        'browser': 'firefox',
+        'platform': 'linux',
+        'mobile': False
+    })
+
 
 def get_team_name(team_id):
     with sql.connect(DB) as con:
@@ -61,7 +72,7 @@ def get_fav_odds(round_data):
     url = f"{base}{competiton}/{home_team}-v-{away_team}/correct-score"
 
     try:
-        r = s.get(url, headers=HEADERS)
+        r = scraper.get(url)
     except Exception as e:
         print(e)
 
